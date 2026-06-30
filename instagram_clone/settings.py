@@ -37,6 +37,15 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+
+
+#     Packages
+    "rest_framework",
+    'rest_framework_simplejwt',
+
+#     Local apps
+    "users",
+    "shared"
 ]
 
 MIDDLEWARE = [
@@ -120,3 +129,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = "static/"
+# FOR MEDIA FILES
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+
+AUTH_USER_MODEL = "users.User"
