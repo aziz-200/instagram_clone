@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timedelta
-from random import random
+import random
 
 from django.core.validators import FileExtensionValidator
 from django.db import models
@@ -11,7 +11,7 @@ from shared.models import BaseModel
 # Create your models here.
 ORDINARY_USER, MANAGER, ADMIN = ('ordinary_user', 'manager', 'administrator')
 VIA_EMAIL, VIA_PHONE = ('via_email', 'via_phone')
-NEW, CODE_VERIFIED, DONE, PHOTO_STEP = ('new', '_code_verified', 'done', 'photo_step')
+NEW, CODE_VERIFIED, DONE, PHOTO_STEP = ('new', 'code_verified', 'done', 'photo_step')
 
 class User(AbstractUser, BaseModel):
     USER_ROLES = (
@@ -23,7 +23,7 @@ class User(AbstractUser, BaseModel):
         (VIA_EMAIL, VIA_EMAIL),
         (VIA_PHONE, VIA_PHONE),
     )
-    AUTH_STATUS = (
+    AUTH_STATUS_CHOICES = (
     (NEW, NEW),
     (CODE_VERIFIED, CODE_VERIFIED),
     (DONE, DONE),
@@ -31,12 +31,12 @@ class User(AbstractUser, BaseModel):
 
     )
     user_role = models.CharField(max_length=31, choices=USER_ROLES  ,default=ORDINARY_USER)
-    AUTH_TYPES = models.CharField(max_length=31, choices=AUTH_TYPE_CHOICES )
-    AUTH_STATUS = models.CharField(max_length=31, choices=AUTH_STATUS, default=NEW)
+    auth_type = models.CharField(max_length=31, choices=AUTH_TYPE_CHOICES )
+    auth_status = models.CharField(max_length=31, choices=AUTH_STATUS_CHOICES, default=NEW)
     email = models.EmailField(null=True, unique=True, blank=True)
     phone_number = models.CharField(max_length=13, null=True, unique=True, blank=True)
     photo = models.ImageField(upload_to='user_photos/', null=True, blank=True,
-                              validators = FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'heir', 'HEIF']))
+                              validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'heir', 'HEIF'])])
 
 
     def __str__(self):
@@ -90,8 +90,7 @@ class User(AbstractUser, BaseModel):
         self.hashing_password()
 
     def save(self, *args, **kwargs):
-        if not self.pk:
-            self.clean()
+        self.clean()
         super(User, self).save(*args, **kwargs)
 PHONE_EXPIRE = 2
 EMAIL_EXPIRE = 5
@@ -103,7 +102,7 @@ class UserConfirmation(BaseModel):
     )
     code = models.CharField(max_length=4)
     verify_type = models.CharField(max_length=31, choices=TYPE_CHOICES, default=VIA_EMAIL)
-    user = models.ForeignKey("user.User", models.CASCADE,related_name="verification_code")
+    user = models.ForeignKey("users.User", models.CASCADE,related_name="verification_code")
     expiration_time = models.DateTimeField(null=True)
     is_verified = models.BooleanField(default=False)
     def __str__(self):

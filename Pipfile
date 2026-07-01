@@ -10,6 +10,8 @@ psycopg2 = "*"
 djangorestframework = "*"
 pillow = "*"
 djangorestframework-simplejwt = "*"
+djangorestframework-stubs = "*"
+phonenumbers = "*"
 
 [dev-packages]
 
