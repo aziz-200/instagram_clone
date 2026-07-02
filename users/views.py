@@ -1,11 +1,86 @@
 from django.shortcuts import render
-from rest_framework import generics, permissions
+from rest_framework import  permissions
 from rest_framework.generics import CreateAPIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from django.utils import timezone
+from rest_framework.views import APIView
+from rest_framework.exceptions import ValidationError
 
+from shared.utils import send_email
 from .serializers import SignUpSerializer
-from .models import User
+from typing import cast
+from .models import User, DONE, CODE_VERIFIED, VIA_PHONE, VIA_EMAIL
+
 
 class CreateUserView(CreateAPIView):
     queryset = User.objects.all()
     permission_classes = [permissions.AllowAny]
     serializer_class = SignUpSerializer
+
+class VerifyUserView(APIView):
+    permission_classes = (IsAuthenticated, )
+
+    def post(self, request, *args, **kwargs):
+        user = cast(User, self.request.user)
+        code = self.request.data.get('code')
+        self.check_verify(user, code)
+
+
+
+        self.check_verify(user, code)
+        return Response({
+            "success": True,
+            "auth_status": user.auth_status,
+            "access":user.token()['access'],
+            "refresh": user.token()['refresh_token']
+            })
+
+
+
+    @staticmethod
+    def check_verify(user, code):
+        verifies = user.verification_code.filter(expiration_time__gte=timezone.now(), code=code, is_verified=False)
+        if not verifies.exists():
+            data = {
+                'message': 'Verification code is expired',
+            }
+            raise ValidationError(data)
+        verifies.update(is_verified=True)
+        if user.auth_status != DONE:
+            user.auth_status = CODE_VERIFIED
+            user.save()
+        return True
+
+class GetNewVerificationCodeView(APIView):
+    permission_classes = (IsAuthenticated, )
+    def get(self, request, *args, **kwargs):
+        user =  self.request.user
+        self.check_verification(user)
+        if user.auth_type == VIA_EMAIL :
+            code = user.create_verify_code(VIA_EMAIL)
+            send_email(user.email, code)
+            print(code)
+        elif user.auth_type == VIA_PHONE:
+            code = user.create_verify_code(VIA_PHONE)
+            send_email(user.phone_number, code )
+            print(code)
+        else:
+            data = {
+                "success": False,
+                "message": "Verification code is not expired",
+            }
+        return Response({
+            "success": True,
+            'message': 'Verification code is send again',
+        })
+
+
+    @staticmethod
+    def check_verification(user):
+        verifies = user.verification_code.filter(expiration_time__gte=timezone.now(), is_verified=False)
+        if verifies.exists():
+            data = {
+        'message': 'Verification code is not expired',
+            }
+            raise ValidationError(data)
