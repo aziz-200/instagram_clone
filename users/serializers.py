@@ -3,7 +3,7 @@ import code
 from django.template.context_processors import request
 from phonenumbers.tzdata.data0 import data
 
-from shared.utils import check_email_or_phone
+from shared.utils import check_email_or_phone, send_email
 from .models import User, UserConfirmation, VIA_EMAIL, VIA_PHONE, NEW, CODE_VERIFIED, DONE, PHOTO_STEP
 from rest_framework import exceptions
 from django.db.models import Q
@@ -36,9 +36,11 @@ class SignUpSerializer(serializers.ModelSerializer):
         user: User = super(SignUpSerializer, self).create(validated_data)
         if user.auth_type == VIA_EMAIL:
             code = user.create_verify_code(VIA_EMAIL)
-            # send_mail(user.email, code)
+            send_email(user.email, code)
         elif user.auth_type == VIA_PHONE:
             code = user.create_verify_code(VIA_PHONE)
+            send_email(user.email, code)
+            #  BU YERDA SMS XABARNOMA JO'NATISH CHAQIRILADI
             # send_phone_code(user.phone_number)
         user.save()
         return user

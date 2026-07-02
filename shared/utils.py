@@ -1,7 +1,11 @@
 import re
 import threading
+from twilio.rest import Client
 import phonenumbers
-from email.message import EmailMessage
+from decouple import config
+from django.template.loader import render_to_string
+from django.core.mail import EmailMessage
+from rest_framework.exceptions import ValidationError
 
 from django.template.loader import render_to_string
 from rest_framework.exceptions import ValidationError
@@ -10,18 +14,15 @@ phone_pattern = re.compile(r"^\+?[\d\s\-\(\)]{7,15}$")
 
 
 def check_email_or_phone(email_or_phone):
-    phone_numbers = phonenumbers.parse(email_or_phone)
     if re.fullmatch(email_pattern, email_or_phone):
-        email_or_phone = "email"
-    elif phonenumbers.is_valid_number(phone_numbers):
-        email_or_phone = "phone"
-    else:
-        data = {
-            "success": False,
-            "error": "Invalid email or/or phone number"
-        }
-        return data
-    return email_or_phone
+        return "email"
+    try:
+        phone_number = phonenumbers.parse(email_or_phone)
+        if phonenumbers.is_valid_number(phone_number):
+            return "phone"
+    except phonenumbers.NumberParseException:
+        pass
+    raise ValidationError({"success": False, "error": "Invalid email or phone number"})
 
 
 # Email jo'natish qilsmi
@@ -57,3 +58,14 @@ def send_email(email, code):
         "content_type": "html",
          "code": code
          })
+
+# SMS XABARNOMA JO'NATISH
+def send_phone_code(phone, code):
+    account_sid = config("TWILIO_ACCOUNT_SID")
+    auth_token = config("TWILIO_AUTH_TOKEN")
+    client = Client(account_sid, auth_token)
+    client.messages.create(
+        body=f"Your code number is {code}",
+        from_="instagram_clone",
+        to=f'{phone}'
+    )
