@@ -1,6 +1,6 @@
 from django.shortcuts import render
-from rest_framework import  permissions
-from rest_framework.generics import CreateAPIView
+from rest_framework import permissions, status
+from rest_framework.generics import CreateAPIView, UpdateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.utils import timezone
@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from rest_framework.exceptions import ValidationError
 
 from shared.utils import send_email
-from .serializers import SignUpSerializer
+from .serializers import SignUpSerializer, ChangeUserInformation, ChangeUsePhotoSerializer
 from typing import cast
 from .models import User, DONE, CODE_VERIFIED, VIA_PHONE, VIA_EMAIL
 
@@ -84,3 +84,52 @@ class GetNewVerificationCodeView(APIView):
         'message': 'Verification code is not expired',
             }
             raise ValidationError(data)
+
+
+class ChangeInformationView(UpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ChangeUserInformation
+    http_method_names = ['patch','post']
+
+    def get_object(self):
+        return self.request.user
+
+    def update(self, request, *args, **kwargs):
+        super(ChangeInformationView, self).update(request, *args, **kwargs)
+        data = {
+            'success': True,
+            'message': 'User has been updated.',
+            'auth_status': self.request.user.auth_status,
+        }
+        return Response(data, status=status.HTTP_200_OK)
+
+    def patch(self, request, *args, **kwargs):
+        super(ChangeInformationView, self).update(request, *args, **kwargs)
+        data = {
+            'success': True,
+            'message': 'User has been updated.',
+            'auth_status': self.request.user.auth_status,
+        }
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class ChangeUsePhotoView(UpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ChangeUsePhotoSerializer  # Klas darajasida serializer belgilab ketgan ma'qul
+
+    def put(self, request, *args, **kwargs):
+        # request.user (instance) ni birinchi argument sifatida uzatamiz
+        serializer = ChangeUsePhotoSerializer(request.user, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            # .save() metodini chaqiramiz, u o'zi ichkarida update() ni ishga tushiradi
+            serializer.save()
+
+            return Response({
+                'success': True,
+                'message': 'User photo has been updated.',
+            }, status=status.HTTP_200_OK)
+
+        return Response(
+            serializer.errors, status=status.HTTP_400_BAD_REQUEST
+        )
