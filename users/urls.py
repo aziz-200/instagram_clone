@@ -5,10 +5,14 @@ from .views import (CreateUserView,
                     GetNewVerificationCodeView,
                     ChangeInformationView,
                     ChangeUsePhotoView,
-                    LoginView)
+                    LoginView,
+                    LoginRefreshView,
+                    LogOutView)
 
 urlpatterns = [
     path('signup/', CreateUserView.as_view(), name='signup'),
+    path('login/refresh/', LoginRefreshView.as_view(), name='login'), # loginni refresh qilish
+    path('logout/', LogOutView.as_view(), name='logout'),
     path('newverify/', GetNewVerificationCodeView.as_view(), name='newverify'),
     path('update-info/', ChangeInformationView.as_view(), name='update-info'),
     path('update-photo/', ChangeUsePhotoView.as_view(), name='update-photo'),

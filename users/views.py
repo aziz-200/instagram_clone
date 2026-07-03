@@ -6,14 +6,16 @@ from rest_framework.response import Response
 from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.exceptions import ValidationError
-from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from typing import cast
 
 from shared.utils import send_email
 from .serializers import (SignUpSerializer,
                           ChangeUserInformation,
                           ChangeUsePhotoSerializer,
-                          LoginSerializer)
+                          LoginSerializer, LoginRefreshSerializer, LogOutSerializer)
 
 from .models import (User,
                      DONE,
@@ -141,3 +143,29 @@ class ChangeUsePhotoView(UpdateAPIView):
 
 class LoginView(TokenObtainPairView):
     serializer_class = LoginSerializer
+
+
+class LoginRefreshView(TokenRefreshView):
+    serializer_class = LoginRefreshSerializer
+
+class LogOutView(APIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = LogOutSerializer
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.serializer_class(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        try:
+            refresh_token = self.requests.data['refresh']
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            data = {
+                'success': True,
+                'message': 'User has been logged out.',
+            }
+            return Response(data, status=status.HTTP_200_OK)
+        except TokenError as e:
+            return Response({
+                'success': False,
+                'message': 'Token error',
+            }, status=status.HTTP_400_BAD_REQUEST)
