@@ -1,19 +1,25 @@
-from django.shortcuts import render
+import code
+
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import permissions, status
 from rest_framework.generics import CreateAPIView, UpdateAPIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from django.utils import timezone
 from rest_framework.views import APIView
-from rest_framework.exceptions import ValidationError
-from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework.exceptions import ValidationError, NotFound
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from typing import cast
-
-from shared.utils import send_email
+from shared.utils import send_email, check_email_or_phone
 from .serializers import (SignUpSerializer,
                           ChangeUserInformation,
                           ChangeUsePhotoSerializer,
-                          LoginSerializer)
+                          LoginSerializer,
+                          LoginRefreshSerializer,
+                          LogOutSerializer,
+                          ForgotPasswordSerializer, ResetPasswordSerializer)
 
 from .models import (User,
                      DONE,
@@ -141,3 +147,76 @@ class ChangeUsePhotoView(UpdateAPIView):
 
 class LoginView(TokenObtainPairView):
     serializer_class = LoginSerializer
+
+
+class LoginRefreshView(TokenRefreshView):
+    serializer_class = LoginRefreshSerializer
+
+class LogOutView(APIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = LogOutSerializer
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.serializer_class(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        try:
+            refresh_token = self.requests.data['refresh']
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            data = {
+                'success': True,
+                'message': 'User has been logged out.',
+            }
+            return Response(data, status=status.HTTP_200_OK)
+        except TokenError as e:
+            return Response({
+                'success': False,
+                'message': 'Token error',
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ForgotPasswordView(APIView):
+    permission_classes = [AllowAny,]
+    serializer_class = ForgotPasswordSerializer
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.serializer_class(data=self.request.data)
+        serializer.is_valid(raise_exception=True)
+        email_or_phone_number = serializer.validated_data.get('email_or_phone_number')
+        user = serializer.validated_data.get('user')
+        if check_email_or_phone(email_or_phone_number) == 'email':
+            code = user.create_verify_code(VIA_EMAIL)
+            send_email(email_or_phone_number, code)
+        elif check_email_or_phone(email_or_phone_number) == 'phone_number':
+            code = user.create_verify_code(VIA_PHONE)
+            send_email(email_or_phone_number, code)
+        return Response({
+            'success': True,
+            'message': 'Email has been sent.',
+            'access_token': user.token()['access'],
+            'refresh_token': user.token()['refresh_token'],
+            'user_status': user.auth_status,
+        }, status=status.HTTP_200_OK)
+
+
+class ResetPasswordView(APIView):
+    serializer_class = ResetPasswordSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['patch', 'put']
+
+    def get_object(self):
+        return self.request.user
+
+    def update(self, request, *args, **kwargs):
+        response = super(ResetPasswordView, self).update(request, *args, **kwargs)
+        try:
+            user = User.objects.get(id = response.data.get('id'))
+        except ObjectDoesNotExist as e:
+            raise NotFound(detail='user not found')
+        return Response({
+            'success': True,
+            'message': 'User\'s password has been updated.',
+            'access': user.token()['access'],
+            'refresh': user.token()['refresh_token'],
+        })
+
