@@ -1,19 +1,17 @@
+import code
 import re
 import threading
 from twilio.rest import Client
 import phonenumbers
 from decouple import config
-from django.template.loader import render_to_string
 from django.core.mail import EmailMessage
+from django.template.loader import render_to_string
 from rest_framework.exceptions import ValidationError
 
-from django.template.loader import render_to_string
-from rest_framework.exceptions import ValidationError
+
 email_pattern = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 phone_pattern = re.compile(r"^\+?[\d\s\-\(\)]{7,15}$")
 username_regex = re.compile(r"^[a-zA-Z0-9_.-]+$")
-
-
 
 def check_email_or_phone(email_or_phone):
     if re.fullmatch(email_pattern, email_or_phone):

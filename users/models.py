@@ -2,13 +2,13 @@ import uuid
 from django.utils import timezone
 from datetime import timedelta
 import random
-
 from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from rest_framework_simplejwt.tokens import RefreshToken
-
 from shared.models import BaseModel
+
+
 # Create your models here.
 ORDINARY_USER, MANAGER, ADMIN = ('ordinary_user', 'manager', 'administrator')
 VIA_EMAIL, VIA_PHONE = ('via_email', 'via_phone')
@@ -20,17 +20,19 @@ class User(AbstractUser, BaseModel):
     (MANAGER, MANAGER),
     (ADMIN, ADMIN),
     )
+
     AUTH_TYPE_CHOICES = (
         (VIA_EMAIL, VIA_EMAIL),
         (VIA_PHONE, VIA_PHONE),
     )
+
     AUTH_STATUS_CHOICES = (
     (NEW, NEW),
     (CODE_VERIFIED, CODE_VERIFIED),
     (DONE, DONE),
     (PHOTO_DONE, PHOTO_DONE)
-
     )
+
     user_role = models.CharField(max_length=31, choices=USER_ROLES  ,default=ORDINARY_USER)
     auth_type = models.CharField(max_length=31, choices=AUTH_TYPE_CHOICES )
     auth_status = models.CharField(max_length=31, choices=AUTH_STATUS_CHOICES, default=NEW)
