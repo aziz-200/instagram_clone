@@ -4,12 +4,14 @@ from .views import (CreateUserView,
                     VerifyUserView,
                     GetNewVerificationCodeView,
                     ChangeInformationView,
-                    ChangeUsePhotoView)
+                    ChangeUsePhotoView,
+                    LoginView)
 
 urlpatterns = [
     path('signup/', CreateUserView.as_view(), name='signup'),
     path('newverify/', GetNewVerificationCodeView.as_view(), name='newverify'),
     path('update-info/', ChangeInformationView.as_view(), name='update-info'),
     path('update-photo/', ChangeUsePhotoView.as_view(), name='update-photo'),
+    path('login/', LoginView.as_view(), name='login'),
     path('verify/', VerifyUserView.as_view(), name='verify'),
 ]

@@ -1,18 +1,20 @@
 import code
 
+from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.validators import FileExtensionValidator
 from django.template.context_processors import request
 from phonenumbers.tzdata.data0 import data
 from rest_framework.generics import UpdateAPIView
 from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from shared.utils import check_email_or_phone, send_email
+from shared.utils import check_email_or_phone, send_email, check_username_type
 from .models import User, UserConfirmation, VIA_EMAIL, VIA_PHONE, NEW, CODE_VERIFIED, DONE, PHOTO_DONE
 from rest_framework import exceptions, status
 from django.db.models import Q
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, PermissionDenied
 
 
 class SignUpSerializer(serializers.ModelSerializer):
@@ -179,4 +181,63 @@ class ChangeUsePhotoSerializer(serializers.Serializer):
         return instance
 
 
+class LoginSerializer(TokenObtainPairSerializer):
+    def __init__(self, *args, **kwargs):
+        super(LoginSerializer, self).__init__(*args, **kwargs)
+        self.fields['userinput'] = serializers.CharField(required=True)
+        self.fields['username'] = serializers.CharField(required=False, read_only=True)
+
+    def auth_validate(self, data):
+        user_input = data.get('userinput')
+        if check_username_type(user_input) == 'username':
+            username = user_input
+        elif check_username_type(user_input) == 'email':
+            user = self.get_user(email__iexact=user_input)
+            username = user.username
+        elif check_username_type(user_input) == 'phone_number':
+            user = self.get_user(phone_number=user_input)
+            username = user.username
+        else:
+            data = {
+                'success': False,
+                'message': 'Invalid username or phone/email.',
+            }
+            raise ValidationError(data)
+        authentication_kwargs = {
+            self.username_field: username,
+            'password': data['password']
+        }
+        # checking userstatus
+        current_user =User.objects.filter(username__iexact=username).first()
+        if current_user is not None and current_user.auth_status == (CODE_VERIFIED, NEW):
+            raise ValidationError({
+                'success': False,
+                'message': 'User is not fully authenticated.',
+            })
+        user = authenticate(**authentication_kwargs)
+        if user is not None:
+            self.user = user
+        else:
+            raise ValidationError({
+                'success': False,
+                'message': 'Invalid username or password.',
+            })
+    def validate(self, data):
+        self.auth_validate(data)
+        if self.user.auth_status  in (CODE_VERIFIED, NEW):
+            raise PermissionDenied("you can not login")
+        data = self.user.token()
+        data['auth_status'] = self.user.auth_status
+        data['full_name'] = self.user.full_name
+        return data
+
+
+    def get_user(self, **kwargs):
+        user = User.objects.filter(**kwargs)
+        if not user.exists():
+            raise ValidationError({
+                'success': False,
+                'message': 'User not found.',
+            })
+        return user.first()
 

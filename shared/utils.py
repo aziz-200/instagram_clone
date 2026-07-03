@@ -11,6 +11,8 @@ from django.template.loader import render_to_string
 from rest_framework.exceptions import ValidationError
 email_pattern = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 phone_pattern = re.compile(r"^\+?[\d\s\-\(\)]{7,15}$")
+username_regex = re.compile(r"^[a-zA-Z0-9_.-]+$")
+
 
 
 def check_email_or_phone(email_or_phone):
@@ -69,3 +71,15 @@ def send_phone_code(phone, code):
         from_="instagram_clone",
         to=f'{phone}'
     )
+# verification of username
+
+def check_username_type(user_input):
+    if re.fullmatch(email_pattern, user_input):
+        user_input = "email"
+    elif re.fullmatch(phone_pattern, user_input):
+        user_input = "phone"
+    elif re.fullmatch(username_regex, user_input):
+        user_input = "username"
+    else:
+        raise ValidationError({"success": False, "error": "Invalid username"})
+    return user_input
