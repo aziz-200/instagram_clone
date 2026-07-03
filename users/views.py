@@ -6,11 +6,20 @@ from rest_framework.response import Response
 from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.exceptions import ValidationError
+from rest_framework_simplejwt.views import TokenObtainPairView
+from typing import cast
 
 from shared.utils import send_email
-from .serializers import SignUpSerializer, ChangeUserInformation, ChangeUsePhotoSerializer
-from typing import cast
-from .models import User, DONE, CODE_VERIFIED, VIA_PHONE, VIA_EMAIL
+from .serializers import (SignUpSerializer,
+                          ChangeUserInformation,
+                          ChangeUsePhotoSerializer,
+                          LoginSerializer)
+
+from .models import (User,
+                     DONE,
+                     CODE_VERIFIED,
+                     VIA_PHONE,
+                     VIA_EMAIL)
 
 
 class CreateUserView(CreateAPIView):
@@ -118,13 +127,9 @@ class ChangeUsePhotoView(UpdateAPIView):
     serializer_class = ChangeUsePhotoSerializer  # Klas darajasida serializer belgilab ketgan ma'qul
 
     def put(self, request, *args, **kwargs):
-        # request.user (instance) ni birinchi argument sifatida uzatamiz
         serializer = ChangeUsePhotoSerializer(request.user, data=request.data, partial=True)
-
         if serializer.is_valid():
-            # .save() metodini chaqiramiz, u o'zi ichkarida update() ni ishga tushiradi
             serializer.save()
-
             return Response({
                 'success': True,
                 'message': 'User photo has been updated.',
@@ -133,3 +138,6 @@ class ChangeUsePhotoView(UpdateAPIView):
         return Response(
             serializer.errors, status=status.HTTP_400_BAD_REQUEST
         )
+
+class LoginView(TokenObtainPairView):
+    serializer_class = LoginSerializer
