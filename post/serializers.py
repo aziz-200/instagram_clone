@@ -61,7 +61,8 @@ class CommentSerializer(serializers.ModelSerializer):
         fields = ('id', 'author',
                   'author', 'parent',
                   'created_time', 'replies',
-                  'me_liked', 'likes_count')
+                  'me_liked', 'likes_count',
+                  'post')
 
     def get_replies(self, obj):
         if obj.child.exists():
@@ -89,6 +90,7 @@ class CommentLikeSerializer(serializers.ModelSerializer):
     class Meta:
         model = CommentLike
         fields = ('id', 'author', 'comment')
+
 
 class PostLikeSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
