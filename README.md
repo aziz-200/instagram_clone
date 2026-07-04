@@ -1,52 +1,48 @@
 # 📸 Instagram Clone — Django REST Framework API
 
-A production-grade **Instagram-like REST API** built with **Django 6**, **Django REST Framework**, and **PostgreSQL**. Features a complete multi-step user authentication system with email/phone verification, JWT token auth, post & comment management, nested replies, and a like/unlike toggle system.
+A production-grade **Instagram-like REST API** built with **Django 6**, **Django REST Framework**, and **PostgreSQL**. Implements a complete 4-step user onboarding pipeline, JWT authentication with token blacklisting, threaded comments with nested replies, and a toggle-based like system — all backed by a clean shared infrastructure with UUID primary keys and async email delivery.
 
 ---
 
 ## 🚀 Features
 
 ### 👤 User & Authentication
-- **Multi-step Registration Flow** — `NEW → CODE_VERIFIED → DONE → PHOTO_DONE` status pipeline
-- **Email & Phone Sign-up** — Auto-detects input type (email or phone number) and routes accordingly
-- **OTP Verification** — 4-digit code sent via email (HTML template); phone via Twilio SMS
-- **JWT Authentication** — Access + Refresh tokens via `djangorestframework-simplejwt`
-- **Token Blacklisting** — Secure logout invalidates refresh tokens
-- **Auto-generated Username** — UUID-based fallback username if not provided
-- **Password Hashing** — Auto-hashes plain-text passwords on save using `pbkdf2_sha256`
-- **Login Flexibility** — Login with username, email, or phone number
-- **Token Refresh** — Custom refresh view that also updates `last_login`
-- **Forgot Password** — Sends reset code via email or phone
-- **Reset Password** — Returns new JWT tokens after successful reset
-- **Profile Photo Upload** — Restricted to `jpg`, `jpeg`, `png`, `heif` formats
+- **4-Step Registration Pipeline** — `NEW → CODE_VERIFIED → DONE → PHOTO_DONE` onboarding flow
+- **Email & Phone Sign-up** — Auto-detects input type via regex and routes OTP accordingly
+- **OTP Verification** — 4-digit code delivered via async HTML email or Twilio SMS
+- **JWT Authentication** — Short-lived access tokens (5 min) + refresh tokens (1 day) via `simplejwt`
+- **Token Blacklisting** — Logout invalidates the refresh token server-side
+- **Flexible Login** — Accepts username, email, or phone number in a single input field
+- **Token Refresh** — Custom refresh view that also updates `last_login` timestamp
+- **Auto-generated Username** — UUID-based fallback if user doesn't provide one
+- **Secure Password Handling** — Auto-hashes plain-text passwords on save (`pbkdf2_sha256`)
+- **Forgot & Reset Password** — Sends OTP, returns fresh JWT pair after successful reset
+- **Profile Photo Upload** — Validates `jpg`, `jpeg`, `png`, `heif` formats via `FileExtensionValidator`
 - **User Roles** — `ordinary_user`, `manager`, `administrator`
 
 ### 📝 Posts
-- **Create / List / Retrieve / Update / Delete** posts
-- **Image Upload** — Only `jpg` and `png` allowed
-- **Caption** — Up to 5000 characters
-- **Like Count** — Annotated per post via `SerializerMethodField`
-- **Comment Count** — Annotated per post via `SerializerMethodField`
-- **Me Liked** — Returns `true/false` based on requesting user
+- **Full CRUD** — Create, list, retrieve, update, and delete posts
+- **Image Upload** — Restricted to `jpg` / `png` via validator
+- **Caption** — Up to 5,000 characters
+- **Computed Fields** — `post_likes_count`, `post_comment_count`, `me_liked` per post response
 
 ### 💬 Comments
-- **Post Comments** — Create and list comments on a specific post
-- **Nested Replies** — Comments support a self-referential `parent` ForeignKey for threaded replies
-- **Comment Likes Count** — Annotated per comment
-- **Me Liked** — Returns whether the requesting user liked the comment
+- **Post Comments** — Create and list comments linked to a specific post
+- **Nested Replies** — Self-referential `parent` FK enables threaded comment trees
+- **Computed Fields** — `likes_count`, `me_liked`, and recursive `replies` in each response
 
 ### ❤️ Likes
-- **Post Likes** — Like/unlike a post via toggle (`PostLikeAPIView`)
-- **Comment Likes** — Like/unlike a comment (`CommentLikeAPIView`)
-- **Unique Constraint** — DB-level uniqueness enforced for user+post and user+comment likes
+- **Toggle Likes** — Single endpoint handles both like and unlike via POST/DELETE
+- **Post & Comment Likes** — Separate like models for posts and comments
+- **Uniqueness Enforced** — DB-level `UniqueConstraint` on `(author, post)` and `(author, comment)`
 
 ### 🔧 Shared / Infrastructure
-- **BaseModel** — UUID primary key, `created_time`, `updated_time` for all models
-- **Custom Pagination** — 10 items per page with `next`, `previous`, `count`, `results`
-- **Async Email Sending** — `threading.Thread` used for non-blocking email delivery
-- **Input Validation Utilities** — Regex-based email/phone/username type checker
-- **Twilio SMS Integration** — Ready-to-use `send_phone_code()` utility
-- **Environment Variables** — All secrets managed via `python-decouple`
+- **BaseModel** — UUID primary key, `created_time`, `updated_time` inherited by all models
+- **Custom Pagination** — 10 items/page with `next`, `previous`, `count`, `results` envelope
+- **Async Email** — `threading.Thread` wrapper prevents email from blocking the request cycle
+- **Regex Validators** — Utility functions detect whether input is email, phone, or username
+- **Twilio SMS** — `send_phone_code()` ready to plug in with account credentials
+- **Environment Config** — All secrets via `python-decouple` / `.env` file
 
 ---
 
@@ -57,12 +53,12 @@ A production-grade **Instagram-like REST API** built with **Django 6**, **Django
 | **Language** | Python 3.14 |
 | **Framework** | Django 6.0.6 |
 | **REST API** | Django REST Framework |
-| **Auth** | JWT via `djangorestframework-simplejwt` |
+| **Auth** | JWT — `djangorestframework-simplejwt` |
 | **Database** | PostgreSQL (`psycopg2`) |
 | **ORM** | Django ORM |
 | **SMS** | Twilio |
 | **Email** | Django Email + HTML templates + Threading |
-| **Phone Validation** | `phonenumbers` library |
+| **Phone Validation** | `phonenumbers` |
 | **Image Handling** | Pillow |
 | **Config** | `python-decouple` (.env) |
 | **Package Manager** | Pipenv |
@@ -73,33 +69,33 @@ A production-grade **Instagram-like REST API** built with **Django 6**, **Django
 
 ```
 instagram_clone/
-├── instagram_clone/          # Project config
-│   ├── settings.py           # JWT, DRF, DB, media config
-│   ├── urls.py               # Root URL routing
+├── instagram_clone/               # Project config
+│   ├── settings.py                # JWT, DRF, DB, media config
+│   ├── urls.py                    # Root URL routing
 │   └── wsgi.py
 │
-├── users/                    # User auth app
-│   ├── models.py             # User (AbstractUser), UserConfirmation
-│   ├── serializers.py        # SignUp, Login, ChangeInfo, ForgotPassword, Reset
-│   ├── views.py              # All auth views
+├── users/                         # User auth & profile app
+│   ├── models.py                  # User (AbstractUser), UserConfirmation
+│   ├── serializers.py             # SignUp, Login, ChangeInfo, ForgotPassword, Reset
+│   ├── views.py                   # All auth & profile views
 │   └── urls.py
 │
-├── post/                     # Post & social features app
-│   ├── models.py             # Post, PostComment, PostLike, CommentLike
-│   ├── serializers.py        # PostSerializer, CommentSerializer, LikeSerializers
-│   ├── views.py              # CRUD + Like toggle views
+├── post/                          # Posts, comments & likes app
+│   ├── models.py                  # Post, PostComment, PostLike, CommentLike
+│   ├── serializers.py             # PostSerializer, CommentSerializer, LikeSerializers
+│   ├── views.py                   # CRUD + Like toggle views
 │   └── urls.py
 │
-├── shared/                   # Reusable utilities
-│   ├── models.py             # BaseModel (UUID, timestamps)
-│   ├── custom_pagination.py  # CustomPagination
-│   └── utils.py              # Email/SMS sender, regex validators
+├── shared/                        # Reusable utilities & base classes
+│   ├── models.py                  # BaseModel (UUID pk, timestamps)
+│   ├── custom_pagination.py       # CustomPagination (10/page)
+│   └── utils.py                   # Email/SMS senders, regex validators
 │
 ├── templates/
 │   └── email/authentication/
-│       └── activate_account.html   # OTP email template
+│       └── activate_account.html  # OTP email HTML template
 │
-├── .env                      # Environment variables (not committed)
+├── .env                           # Environment variables (not committed)
 ├── Pipfile
 └── manage.py
 ```
@@ -175,37 +171,37 @@ twilio
 python-decouple
 ```
 
-Install all:
-```bash
-pipenv install
-```
-
 ---
 
 ## 🔐 Authentication Flow
 
-The registration process follows a **4-step pipeline**:
+Registration follows a strict **4-step pipeline**. Each step advances `auth_status`:
 
 ```
-Step 1: POST /users/signup/
-        → provide email or phone
-        → system sends OTP code
-        → auth_status: NEW
+Step 1 — Sign Up
+  POST /users/signup/
+  Body: { "email_phone_number": "user@example.com" }
+  ← system sends OTP to email/phone
+  ← auth_status: "new"
 
-Step 2: POST /users/verify/
-        → submit OTP code
-        → auth_status: CODE_VERIFIED
+Step 2 — Verify OTP
+  POST /users/verify/
+  Body: { "code": "4821" }
+  ← auth_status: "code_verified"
 
-Step 3: PATCH /users/update-info/
-        → set first_name, last_name, username, password
-        → auth_status: DONE
+Step 3 — Set Profile Info
+  PATCH /users/update-info/
+  Body: { "first_name": "Aziz", "last_name": "Doe",
+          "username": "aziz_dev", "password": "...", "confirm_password": "..." }
+  ← auth_status: "done"
 
-Step 4: PUT /users/update-photo/
-        → upload profile photo
-        → auth_status: PHOTO_DONE
+Step 4 — Upload Photo
+  PUT /users/update-photo/
+  Body: form-data { "photo": <file> }
+  ← auth_status: "photo_done"
 ```
 
-All endpoints use **JWT Bearer tokens**:
+All protected endpoints require:
 ```
 Authorization: Bearer <access_token>
 ```
@@ -214,35 +210,90 @@ Authorization: Bearer <access_token>
 
 ## 📌 API Endpoints
 
-### Users (`/users/`)
+### 🔑 Users (`/users/`)
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/users/signup/` | ❌ | Register with email or phone |
-| `POST` | `/users/verify/` | ✅ | Submit OTP verification code |
-| `GET` | `/users/newverify/` | ✅ | Request a new OTP code |
-| `PATCH` | `/users/update-info/` | ✅ | Set username, name, password |
-| `PUT` | `/users/update-photo/` | ✅ | Upload profile photo |
-| `POST` | `/users/login/` | ❌ | Login (email/phone/username) |
-| `POST` | `/users/login/refresh/` | ❌ | Refresh access token |
-| `POST` | `/users/logout/` | ✅ | Logout & blacklist token |
-| `POST` | `/users/forgot-password/` | ❌ | Send reset OTP |
-| `PATCH` | `/users/reset-password/` | ✅ | Set new password |
+| Method | Endpoint | Auth | Request Body | Response |
+|---|---|---|---|---|
+| `POST` | `/users/signup/` | ❌ | `{ "email_phone_number": "..." }` | `{ id, auth_type, auth_status, access, refresh_token }` |
+| `POST` | `/users/verify/` | ✅ | `{ "code": "1234" }` | `{ success, auth_status, access, refresh }` |
+| `GET` | `/users/newverify/` | ✅ | — | `{ success, message }` |
+| `PATCH` | `/users/update-info/` | ✅ | `{ first_name, last_name, username, password, confirm_password }` | `{ success, auth_status }` |
+| `PUT` | `/users/update-photo/` | ✅ | `form-data { photo }` | `{ success, message }` |
+| `POST` | `/users/login/` | ❌ | `{ "userinput": "aziz_dev", "password": "..." }` | `{ access, refresh_token, auth_status, full_name }` |
+| `POST` | `/users/login/refresh/` | ❌ | `{ "refresh": "..." }` | `{ access }` |
+| `POST` | `/users/logout/` | ✅ | `{ "refresh": "..." }` | `{ success, message }` |
+| `POST` | `/users/forgot-password/` | ❌ | `{ "email_or_phone_number": "..." }` | `{ success, access_token, refresh_token, user_status }` |
+| `PATCH` | `/users/reset-password/` | ✅ | `{ "password": "...", "confirm_password": "..." }` | `{ success, access, refresh }` |
 
-### Posts (`/post/`)
+---
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `GET` | `/post/list/` | Optional | List all posts (paginated) |
-| `POST` | `/post/create/` | ✅ | Create a post |
-| `GET/PUT/DELETE` | `/post/<uuid>/` | Optional/✅ | Get, update, or delete a post |
-| `GET` | `/post/<uuid>/comments/` | ✅ | List comments on a post |
-| `POST` | `/post/<uuid>/comments/create/` | ✅ | Add a comment to a post |
-| `GET` | `/post/<uuid>/likes/` | ❌ | List likes on a post |
-| `POST/DELETE` | `/post/<uuid>/create-delete-likes/` | ✅ | Like or unlike a post |
-| `GET/PUT/DELETE` | `/post/comments/<uuid>/` | ❌ | Get, update, delete a comment |
-| `GET` | `/post/comments/<uuid>/likes/` | ❌ | List likes on a comment |
-| `POST/DELETE` | `/post/comments/<uuid>/create-delete-likes/` | ✅ | Like or unlike a comment |
+### 📝 Posts (`/post/`)
+
+| Method | Endpoint | Auth | Request Body | Response |
+|---|---|---|---|---|
+| `GET` | `/post/list/` | Optional | — | Paginated `{ next, previous, count, results: [posts] }` |
+| `POST` | `/post/create/` | ✅ | `form-data { image, caption }` | Created post object |
+| `GET` | `/post/<uuid>/` | Optional | — | Single post with likes count, comment count, me_liked |
+| `PUT` | `/post/<uuid>/` | ✅ | `{ caption }` | `{ success, message }` |
+| `DELETE` | `/post/<uuid>/` | ✅ | — | `{ success, message }` |
+| `GET` | `/post/<uuid>/comments/` | ✅ | — | List of comments with nested replies |
+| `POST` | `/post/<uuid>/comments/create/` | ✅ | `{ "comment": "...", "parent": null }` | Created comment object |
+| `GET` | `/post/<uuid>/likes/` | ❌ | — | List of users who liked the post |
+| `POST` | `/post/<uuid>/create-delete-likes/` | ✅ | — | `{ success, message, data }` — creates like |
+| `DELETE` | `/post/<uuid>/create-delete-likes/` | ✅ | — | `{ success, message }` — removes like |
+
+---
+
+### 💬 Comments (`/post/comments/`)
+
+| Method | Endpoint | Auth | Request Body | Response |
+|---|---|---|---|---|
+| `GET` | `/post/comments/<uuid>/` | ❌ | — | Comment detail with replies and like count |
+| `PUT` | `/post/comments/<uuid>/` | ✅ | `{ "comment": "..." }` | Updated comment object |
+| `DELETE` | `/post/comments/<uuid>/` | ✅ | — | 204 No Content |
+| `GET` | `/post/comments/<uuid>/likes/` | ❌ | — | List of users who liked the comment |
+| `POST` | `/post/comments/<uuid>/create-delete-likes/` | ✅ | — | Toggle like on comment |
+
+---
+
+### 📦 Sample Response — Post List
+
+```json
+{
+  "next": "http://localhost:8000/post/list/?page=2",
+  "previous": null,
+  "count": 42,
+  "results": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "author": {
+        "id": "...",
+        "username": "aziz_dev",
+        "photo": "/media/user_photos/aziz.jpg"
+      },
+      "image": "/media/posts_images/photo.jpg",
+      "caption": "Hello world!",
+      "created_time": "2025-06-01T10:30:00Z",
+      "post_likes_count": 14,
+      "post_comment_count": 3,
+      "me_liked": true
+    }
+  ]
+}
+```
+
+---
+
+### 📦 Sample Response — Login
+
+```json
+{
+  "access": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+  "refresh_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+  "auth_status": "photo_done",
+  "full_name": "Aziz Doe"
+}
+```
 
 ---
 
@@ -257,7 +308,7 @@ Authorization: Bearer <access_token>
 | `auth_status` | CharField | `new` → `code_verified` → `done` → `photo_done` |
 | `email` | EmailField | Unique, nullable |
 | `phone_number` | CharField | Unique, nullable |
-| `photo` | ImageField | `user_photos/` upload path |
+| `photo` | ImageField | `user_photos/` |
 
 ### UserConfirmation
 | Field | Type | Notes |
@@ -272,18 +323,18 @@ Authorization: Bearer <access_token>
 |---|---|---|
 | `author` | FK → User | |
 | `image` | ImageField | `posts_images/` |
-| `caption` | TextField | Max 5000 chars |
+| `caption` | TextField | Max 5,000 chars |
 
 ### PostComment
 | Field | Type | Notes |
 |---|---|---|
 | `author` | FK → User | |
 | `post` | FK → Post | |
-| `comment` | TextField | Max 1000 chars |
-| `parent` | FK → self | Nullable, for nested replies |
+| `comment` | TextField | Max 1,000 chars |
+| `parent` | FK → self | Nullable — enables nested replies |
 
 ### PostLike / CommentLike
-- Unique constraint on `(author, post)` and `(author, comment)` — one like per user per item
+- `UniqueConstraint` on `(author, post)` and `(author, comment)` — one like per user per item
 
 ---
 
@@ -294,7 +345,7 @@ ACCESS_TOKEN_LIFETIME  = 5 minutes
 REFRESH_TOKEN_LIFETIME = 1 day
 ALGORITHM              = HS256
 AUTH_HEADER_TYPES      = ("Bearer",)
-TOKEN_BLACKLIST        = enabled (for logout)
+TOKEN_BLACKLIST        = enabled   # used on logout
 ```
 
 ---
